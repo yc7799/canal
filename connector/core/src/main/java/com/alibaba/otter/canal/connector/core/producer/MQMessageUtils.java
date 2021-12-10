@@ -706,6 +706,7 @@ public class MQMessageUtils {
                             flatMessageTmp.setEs(flatMessage.getEs());
                             flatMessageTmp.setTs(flatMessage.getTs());
                             flatMessageTmp.setPkNames(flatMessage.getPkNames());
+                            flatMessageTmp.setNanoIncrease(flatMessage.getNanoIncrease());
                         }
                         List<Map<String, String>> data = flatMessageTmp.getData();
                         if (data == null) {
