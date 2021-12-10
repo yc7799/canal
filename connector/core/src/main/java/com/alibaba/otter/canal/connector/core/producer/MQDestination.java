@@ -14,6 +14,7 @@ public class MQDestination {
     private Integer partitionsNum;
     private String  partitionHash;
     private String  dynamicTopic;
+    private Boolean destinationAsEnvKey;
     private String  dynamicTopicPartitionNum;
     private Boolean enableDynamicQueuePartition;
 
@@ -79,5 +80,13 @@ public class MQDestination {
 
     public void setEnableDynamicQueuePartition(Boolean enableDynamicQueuePartition) {
         this.enableDynamicQueuePartition = enableDynamicQueuePartition;
+    }
+
+    public Boolean getDestinationAsEnvKey() {
+        return destinationAsEnvKey;
+    }
+
+    public void setDestinationAsEnvKey(Boolean destinationAsEnvKey) {
+        this.destinationAsEnvKey = destinationAsEnvKey;
     }
 }

@@ -40,13 +40,13 @@ import com.alibaba.otter.canal.protocol.Message;
  * @author rewerma 2018-6-11 下午05:30:49
  * @version 1.0.0
  */
-@SuppressWarnings({ "rawtypes", "unchecked" })
+@SuppressWarnings({"rawtypes", "unchecked"})
 @SPI("kafka")
 public class CanalKafkaProducer extends AbstractMQProducer implements CanalMQProducer {
 
-    private static final Logger      logger              = LoggerFactory.getLogger(CanalKafkaProducer.class);
+    private static final Logger logger = LoggerFactory.getLogger(CanalKafkaProducer.class);
 
-    private static final String      PREFIX_KAFKA_CONFIG = "kafka.";
+    private static final String PREFIX_KAFKA_CONFIG = "kafka.";
 
     private Producer<String, byte[]> producer;
 
@@ -145,9 +145,11 @@ public class CanalKafkaProducer extends AbstractMQProducer implements CanalMQPro
             List result;
             if (!StringUtils.isEmpty(mqDestination.getDynamicTopic())) {
                 // 动态topic路由计算,只是基于schema/table,不涉及proto数据反序列化
-                Map<String, Message> messageMap = MQMessageUtils.messageTopics(message,
-                    mqDestination.getTopic(),
-                    mqDestination.getDynamicTopic());
+//                Map<String, Message> messageMap = MQMessageUtils.messageTopics(message,
+//                        mqDestination.getTopic(),
+//                        mqDestination.getDynamicTopic());
+
+                Map<String, Message> messageMap = MQMessageUtils.messageTopics(message, mqDestination);
 
                 // 针对不同的topic,引入多线程提升效率
                 for (Map.Entry<String, Message> entry : messageMap.entrySet()) {
@@ -166,9 +168,9 @@ public class CanalKafkaProducer extends AbstractMQProducer implements CanalMQPro
             } else {
                 result = new ArrayList();
                 List<Future> futures = send(mqDestination,
-                    mqDestination.getTopic(),
-                    message,
-                    mqProperties.isFlatMessage());
+                        mqDestination.getTopic(),
+                        message,
+                        mqProperties.isFlatMessage());
                 result.add(futures);
             }
 
@@ -210,52 +212,52 @@ public class CanalKafkaProducer extends AbstractMQProducer implements CanalMQPro
                 EntryRowData[] datas = MQMessageUtils.buildMessageData(message, buildExecutor);
                 // 串行分区
                 Message[] messages = MQMessageUtils.messagePartition(datas,
-                    message.getId(),
-                    partitionNum,
-                    mqDestination.getPartitionHash(),
-                    this.mqProperties.isDatabaseHash());
+                        message.getId(),
+                        partitionNum,
+                        mqDestination.getPartitionHash(),
+                        this.mqProperties.isDatabaseHash());
                 int length = messages.length;
                 for (int i = 0; i < length; i++) {
                     Message messagePartition = messages[i];
                     if (messagePartition != null) {
                         records.add(new ProducerRecord<>(topicName,
-                            i,
-                            null,
-                            CanalMessageSerializerUtil.serializer(messagePartition,
-                                mqProperties.isFilterTransactionEntry())));
+                                i,
+                                null,
+                                CanalMessageSerializerUtil.serializer(messagePartition,
+                                        mqProperties.isFilterTransactionEntry())));
                     }
                 }
             } else {
                 final int partition = mqDestination.getPartition() != null ? mqDestination.getPartition() : 0;
                 records.add(new ProducerRecord<>(topicName,
-                    partition,
-                    null,
-                    CanalMessageSerializerUtil.serializer(message, mqProperties.isFilterTransactionEntry())));
+                        partition,
+                        null,
+                        CanalMessageSerializerUtil.serializer(message, mqProperties.isFilterTransactionEntry())));
             }
         } else {
             // 发送扁平数据json
             // 并发构造
             EntryRowData[] datas = MQMessageUtils.buildMessageData(message, buildExecutor);
             // 串行分区
-            List<FlatMessage> flatMessages = MQMessageUtils.messageConverter(datas, message.getId());
+            List<FlatMessage> flatMessages = MQMessageUtils.messageConverter(datas, message.getId(), mqDestination);
             for (FlatMessage flatMessage : flatMessages) {
                 if (mqDestination.getPartitionHash() != null && !mqDestination.getPartitionHash().isEmpty()) {
                     FlatMessage[] partitionFlatMessage = MQMessageUtils.messagePartition(flatMessage,
-                        partitionNum,
-                        mqDestination.getPartitionHash(),
-                        this.mqProperties.isDatabaseHash());
+                            partitionNum,
+                            mqDestination.getPartitionHash(),
+                            this.mqProperties.isDatabaseHash());
                     int length = partitionFlatMessage.length;
                     for (int i = 0; i < length; i++) {
                         FlatMessage flatMessagePart = partitionFlatMessage[i];
                         if (flatMessagePart != null) {
                             records.add(new ProducerRecord<>(topicName, i, null, JSON.toJSONBytes(flatMessagePart,
-                                SerializerFeature.WriteMapNullValue)));
+                                    SerializerFeature.WriteMapNullValue)));
                         }
                     }
                 } else {
                     final int partition = mqDestination.getPartition() != null ? mqDestination.getPartition() : 0;
                     records.add(new ProducerRecord<>(topicName, partition, null, JSON.toJSONBytes(flatMessage,
-                        SerializerFeature.WriteMapNullValue)));
+                            SerializerFeature.WriteMapNullValue)));
                 }
             }
         }

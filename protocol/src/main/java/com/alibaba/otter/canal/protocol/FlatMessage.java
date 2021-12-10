@@ -27,6 +27,8 @@ public class FlatMessage implements Serializable {
     private Map<String, String>       mysqlType;
     private List<Map<String, String>> data;
     private List<Map<String, String>> old;
+    private Long                      nanoIncrease;
+
 
     public FlatMessage() {
     }
@@ -146,10 +148,18 @@ public class FlatMessage implements Serializable {
         this.es = es;
     }
 
+    public Long getNanoIncrease() {
+        return nanoIncrease;
+    }
+
+    public void setNanoIncrease(Long nanoIncrease) {
+        this.nanoIncrease = nanoIncrease;
+    }
+
     @Override
     public String toString() {
         return "FlatMessage [id=" + id + ", database=" + database + ", table=" + table + ", isDdl=" + isDdl + ", type="
                + type + ", es=" + es + ", ts=" + ts + ", sql=" + sql + ", sqlType=" + sqlType + ", mysqlType="
-               + mysqlType + ", data=" + data + ", old=" + old + "]";
+               + mysqlType + ", data=" + data + ", old=" + old + ", nanoIncrease=" + nanoIncrease + "]";
     }
 }

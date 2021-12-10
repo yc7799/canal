@@ -188,6 +188,71 @@ public class MQMessageUtils {
     }
 
     /**
+     * 按 schema 或者 schema+table 将 message 分配到对应topic
+     *
+     * @param message 原message
+     * @param mqDestination mqDestination
+     * @return 分隔后的message map
+     */
+    public static Map<String, Message> messageTopics(Message message, MQDestination mqDestination) {
+        String defaultTopic = mqDestination.getTopic();
+        String dynamicTopicConfigs = mqDestination.getDynamicTopic();
+        Boolean destinationAsEnvKey = mqDestination.getDestinationAsEnvKey();
+        List<CanalEntry.Entry> entries;
+        if (message.isRaw()) {
+            List<ByteString> rawEntries = message.getRawEntries();
+            entries = new ArrayList<>(rawEntries.size());
+            for (ByteString byteString : rawEntries) {
+                CanalEntry.Entry entry;
+                try {
+                    entry = CanalEntry.Entry.parseFrom(byteString);
+                } catch (InvalidProtocolBufferException e) {
+                    throw new RuntimeException(e);
+                }
+                entries.add(entry);
+            }
+        } else {
+            entries = message.getEntries();
+        }
+        Map<String, Message> messages = new HashMap<>();
+        for (CanalEntry.Entry entry : entries) {
+            // 如果有topic路由,则忽略begin/end事件
+            if (entry.getEntryType() == CanalEntry.EntryType.TRANSACTIONBEGIN
+                    || entry.getEntryType() == CanalEntry.EntryType.TRANSACTIONEND) {
+                continue;
+            }
+
+            String schemaName = entry.getHeader().getSchemaName();
+            String tableName = entry.getHeader().getTableName();
+
+            if (StringUtils.isEmpty(schemaName) || StringUtils.isEmpty(tableName)) {
+                put2MapMessage(messages, message.getId(), defaultTopic, entry);
+            } else {
+                if(destinationAsEnvKey != null && destinationAsEnvKey) {
+                    schemaName = "ods";
+                }
+
+                Set<String> topics = matchTopics(schemaName + "." + tableName, dynamicTopicConfigs);
+                if (topics != null) {
+                    for (String topic : topics) {
+                        put2MapMessage(messages, message.getId(), topic, entry);
+                    }
+                } else {
+                    topics = matchTopics(schemaName, dynamicTopicConfigs);
+                    if (topics != null) {
+                        for (String topic : topics) {
+                            put2MapMessage(messages, message.getId(), topic, entry);
+                        }
+                    } else {
+                        put2MapMessage(messages, message.getId(), defaultTopic, entry);
+                    }
+                }
+            }
+        }
+        return messages;
+    }
+
+    /**
      * 多线程构造message的rowChanged对象，比如为partition/flastMessage转化等处理 </br>
      * 因为protobuf对象的序列化和反序列化是cpu密集型，串行执行会有代价
      */
@@ -391,6 +456,121 @@ public class MQMessageUtils {
 
                     Map<String, String> row = new LinkedHashMap<>();
                     List<CanalEntry.Column> columns;
+
+                    if (eventType == CanalEntry.EventType.DELETE) {
+                        columns = rowData.getBeforeColumnsList();
+                    } else {
+                        columns = rowData.getAfterColumnsList();
+                    }
+
+                    for (CanalEntry.Column column : columns) {
+                        if (!hasInitPkNames && column.getIsKey()) {
+                            flatMessage.addPkName(column.getName());
+                        }
+                        sqlType.put(column.getName(), column.getSqlType());
+                        mysqlType.put(column.getName(), column.getMysqlType());
+                        if (column.getIsNull()) {
+                            row.put(column.getName(), null);
+                        } else {
+                            row.put(column.getName(), column.getValue());
+                        }
+                        // 获取update为true的字段
+                        if (column.getUpdated()) {
+                            updateSet.add(column.getName());
+                        }
+                    }
+
+                    hasInitPkNames = true;
+                    if (!row.isEmpty()) {
+                        data.add(row);
+                    }
+
+                    if (eventType == CanalEntry.EventType.UPDATE) {
+                        Map<String, String> rowOld = new LinkedHashMap<>();
+                        for (CanalEntry.Column column : rowData.getBeforeColumnsList()) {
+                            if (updateSet.contains(column.getName())) {
+                                if (column.getIsNull()) {
+                                    rowOld.put(column.getName(), null);
+                                } else {
+                                    rowOld.put(column.getName(), column.getValue());
+                                }
+                            }
+                        }
+                        // update操作将记录修改前的值
+                        if (!rowOld.isEmpty()) {
+                            old.add(rowOld);
+                        }
+                    }
+                }
+                if (!sqlType.isEmpty()) {
+                    flatMessage.setSqlType(sqlType);
+                }
+                if (!mysqlType.isEmpty()) {
+                    flatMessage.setMysqlType(mysqlType);
+                }
+                if (!data.isEmpty()) {
+                    flatMessage.setData(data);
+                }
+                if (!old.isEmpty()) {
+                    flatMessage.setOld(old);
+                }
+            }
+        }
+        return flatMessages;
+    }
+
+    /**
+     * 将Message转换为FlatMessage
+     *
+     * @return FlatMessage列表
+     * @author agapple 2018年12月11日 下午1:28:32
+     */
+    public static List<FlatMessage> messageConverter(EntryRowData[] datas, long id, MQDestination mqDestination) {
+        List<FlatMessage> flatMessages = new ArrayList<>();
+        for (EntryRowData entryRowData : datas) {
+            CanalEntry.Entry entry = entryRowData.entry;
+            CanalEntry.RowChange rowChange = entryRowData.rowChange;
+            // 如果有分区路由,则忽略begin/end事件
+            if (entry.getEntryType() == CanalEntry.EntryType.TRANSACTIONBEGIN
+                    || entry.getEntryType() == CanalEntry.EntryType.TRANSACTIONEND) {
+                continue;
+            }
+
+            // build flatMessage
+            CanalEntry.EventType eventType = rowChange.getEventType();
+            FlatMessage flatMessage = new FlatMessage(id);
+            flatMessages.add(flatMessage);
+            flatMessage.setDatabase(entry.getHeader().getSchemaName());
+            flatMessage.setTable(entry.getHeader().getTableName());
+            flatMessage.setIsDdl(rowChange.getIsDdl());
+            flatMessage.setType(eventType.toString());
+            flatMessage.setEs(entry.getHeader().getExecuteTime());
+            flatMessage.setTs(System.currentTimeMillis());
+            flatMessage.setSql(rowChange.getSql());
+
+            if (!rowChange.getIsDdl()) {
+                Map<String, Integer> sqlType = new LinkedHashMap<>();
+                Map<String, String> mysqlType = new LinkedHashMap<>();
+                List<Map<String, String>> data = new ArrayList<>();
+                List<Map<String, String>> old = new ArrayList<>();
+
+                Set<String> updateSet = new HashSet<>();
+                boolean hasInitPkNames = false;
+                for (CanalEntry.RowData rowData : rowChange.getRowDatasList()) {
+                    if (eventType != CanalEntry.EventType.INSERT && eventType != CanalEntry.EventType.UPDATE
+                            && eventType != CanalEntry.EventType.DELETE) {
+                        continue;
+                    }
+
+                    Map<String, String> row = new LinkedHashMap<>();
+                    List<CanalEntry.Column> columns;
+
+                    //设置destination作为env_key的值
+                    if(mqDestination.getDestinationAsEnvKey()){
+                        row.put("_env_key",mqDestination.getCanalDestination());
+                        flatMessage.addPkName("_env_key");
+                        flatMessage.setNanoIncrease(System.nanoTime());
+                    }
 
                     if (eventType == CanalEntry.EventType.DELETE) {
                         columns = rowData.getBeforeColumnsList();
