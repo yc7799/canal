@@ -567,8 +567,7 @@ public class MQMessageUtils {
 
                     //设置destination作为env_key的值
                     if(mqDestination.getDestinationAsEnvKey()){
-                        row.put("_env_key",mqDestination.getCanalDestination());
-                        flatMessage.addPkName("_env_key");
+                        row.put("env_key__",mqDestination.getCanalDestination());
                         flatMessage.setNanoIncrease(System.nanoTime());
                     }
 
@@ -580,6 +579,9 @@ public class MQMessageUtils {
 
                     for (CanalEntry.Column column : columns) {
                         if (!hasInitPkNames && column.getIsKey()) {
+                            if(mqDestination.getDestinationAsEnvKey()){
+                                flatMessage.addPkName("env_key__");
+                            }
                             flatMessage.addPkName(column.getName());
                         }
                         sqlType.put(column.getName(), column.getSqlType());
