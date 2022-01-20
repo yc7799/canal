@@ -439,6 +439,7 @@ public class MQMessageUtils {
             flatMessage.setEs(entry.getHeader().getExecuteTime());
             flatMessage.setTs(System.currentTimeMillis());
             flatMessage.setSql(rowChange.getSql());
+            flatMessage.setLogfileOffset(entry.getHeader().getLogfileOffset());
 
             if (!rowChange.getIsDdl()) {
                 Map<String, Integer> sqlType = new LinkedHashMap<>();
@@ -547,6 +548,8 @@ public class MQMessageUtils {
             flatMessage.setEs(entry.getHeader().getExecuteTime());
             flatMessage.setTs(System.currentTimeMillis());
             flatMessage.setSql(rowChange.getSql());
+            flatMessage.setLogfileOffset(entry.getHeader().getLogfileOffset());
+            flatMessage.setLogfileName(entry.getHeader().getLogfileName());
 
             if (!rowChange.getIsDdl()) {
                 Map<String, Integer> sqlType = new LinkedHashMap<>();
@@ -709,6 +712,8 @@ public class MQMessageUtils {
                             flatMessageTmp.setTs(flatMessage.getTs());
                             flatMessageTmp.setPkNames(flatMessage.getPkNames());
                             flatMessageTmp.setNanoIncrease(flatMessage.getNanoIncrease());
+                            flatMessageTmp.setLogfileOffset(flatMessage.getLogfileOffset());
+                            flatMessageTmp.setLogfileName(flatMessage.getLogfileName());
                         }
                         List<Map<String, String>> data = flatMessageTmp.getData();
                         if (data == null) {

@@ -28,6 +28,8 @@ public class FlatMessage implements Serializable {
     private List<Map<String, String>> data;
     private List<Map<String, String>> old;
     private Long                      nanoIncrease;
+    private Long                      logfileOffset;
+    private String                    logfileName;
 
 
     public FlatMessage() {
@@ -156,10 +158,49 @@ public class FlatMessage implements Serializable {
         this.nanoIncrease = nanoIncrease;
     }
 
+    public Boolean getDdl() {
+        return isDdl;
+    }
+
+    public void setDdl(Boolean ddl) {
+        isDdl = ddl;
+    }
+
+    public Long getLogfileOffset() {
+        return logfileOffset;
+    }
+
+    public void setLogfileOffset(Long logfileOffset) {
+        this.logfileOffset = logfileOffset;
+    }
+
+    public String getLogfileName() {
+        return logfileName;
+    }
+
+    public void setLogfileName(String logfileName) {
+        this.logfileName = logfileName;
+    }
+
     @Override
     public String toString() {
-        return "FlatMessage [id=" + id + ", database=" + database + ", table=" + table + ", isDdl=" + isDdl + ", type="
-               + type + ", es=" + es + ", ts=" + ts + ", sql=" + sql + ", sqlType=" + sqlType + ", mysqlType="
-               + mysqlType + ", data=" + data + ", old=" + old + ", nanoIncrease=" + nanoIncrease + "]";
+        return "FlatMessage{" +
+                "id=" + id +
+                ", database='" + database + '\'' +
+                ", table='" + table + '\'' +
+                ", pkNames=" + pkNames +
+                ", isDdl=" + isDdl +
+                ", type='" + type + '\'' +
+                ", es=" + es +
+                ", ts=" + ts +
+                ", sql='" + sql + '\'' +
+                ", sqlType=" + sqlType +
+                ", mysqlType=" + mysqlType +
+                ", data=" + data +
+                ", old=" + old +
+                ", nanoIncrease=" + nanoIncrease +
+                ", logfileOffset=" + logfileOffset +
+                ", logfileName='" + logfileName + '\'' +
+                '}';
     }
 }
