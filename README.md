@@ -100,3 +100,5 @@ canal 作为 MySQL binlog 增量获取和解析工具，可将变更记录投递
 
 ## 问题反馈
 - 报告 issue: [github issues](https://github.com/alibaba/canal/issues)
+
+## 增加envkey支持
